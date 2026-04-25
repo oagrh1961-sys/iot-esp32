@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard IoT</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    header {
+      background: #16213e;
+      padding: 20px 30px;
+      border-bottom: 2px solid #0f3460;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    header h1 { font-size: 1.8rem; color: #00d4ff; }
+    header p  { font-size: 0.85rem; color: #a0a0b0; margin-top: 4px; }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f3460;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+    }
+    .dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      background: #555;
+      transition: background 0.4s;
+    }
+    .dot.conectado  { background: #a8e063; box-shadow: 0 0 6px #a8e063; }
+    .dot.sin-datos  { background: #ff6b6b; box-shadow: 0 0 6px #ff6b6b; }
+
+    main { padding: 24px 30px; max-width: 1400px; margin: 0 auto; }
+
+    /* Cards */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px;
+      border-left: 4px solid transparent;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .card-temp  { border-color: #ff6b6b; }
+    .card-hum   { border-color: #00d4ff; }
+    .card-total { border-color: #a8e063; }
+    .card-dev   { border-color: #f9ca24; }
+    .card label { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1px; color: #888; display: block; margin-bottom: 8px; }
+    .card .value { font-size: 2.2rem; font-weight: 700; }
+    .card-temp  .value { color: #ff6b6b; }
+    .card-hum   .value { color: #00d4ff; }
+    .card-total .value { color: #a8e063; }
+    .badge-dev {
+      display: inline-block;
+      background: #f9ca24;
+      color: #1a1a2e;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+
+    /* Stats */
+    .stats-title { font-size: 1rem; color: #a0a0c0; margin-bottom: 12px; }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #16213e;
+      border-radius: 10px;
+      padding: 14px 18px;
+      text-align: center;
+      border: 1px solid #0f3460;
+    }
+    .stat-card label { font-size: 0.72rem; text-transform: uppercase; color: #777; display: block; margin-bottom: 6px; }
+    .stat-card .stat-val { font-size: 1.5rem; font-weight: 700; }
+
+    /* Charts */
+    .charts-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    .chart-box {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .chart-box h3 { font-size: 0.95rem; color: #a0a0c0; margin-bottom: 14px; }
+    canvas { width: 100% !important; }
+
+    /* Table */
+    .table-box {
+      background: #16213e;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .table-header h3 { font-size: 0.95rem; color: #a0a0c0; }
+    .btn-export {
+      background: #a8e063;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-export:hover { opacity: 0.85; }
+    .table-scroll { max-height: 320px; overflow-y: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th {
+      background: #0f3460;
+      color: #00d4ff;
+      text-align: left;
+      padding: 10px 12px;
+      position: sticky;
+      top: 0;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+    td { padding: 9px 12px; border-bottom: 1px solid #0f3460; color: #c8c8d8; }
+    tr:hover td { background: rgba(15,52,96,0.4); }
+    td.temp-val { color: #ff6b6b; font-weight: 600; }
+    td.hum-val  { color: #00d4ff; font-weight: 600; }
+
+    footer {
+      text-align: center;
+      padding: 18px;
+      font-size: 0.78rem;
+      color: #555;
+      border-top: 1px solid #16213e;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌡️ Dashboard IoT</h1>
+    <p>Actualización automática cada 5 segundos</p>
+  </div>
+  <div class="status-badge">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Cargando…</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Main cards -->
+  <div class="cards">
+    <div class="card card-temp">
+      <label>Temperatura actual</label>
+      <div class="value" id="tempActual">--</div>
+    </div>
+    <div class="card card-hum">
+      <label>Humedad actual</label>
+      <div class="value" id="humActual">--</div>
+    </div>
+    <div class="card card-total">
+      <label>Total registros</label>
+      <div class="value" id="totalReg">--</div>
+    </div>
+    <div class="card card-dev">
+      <label>Dispositivo</label>
+      <div id="dispositivoVal"><span class="badge-dev">--</span></div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <p class="stats-title">📊 Estadísticas (todos los datos)</p>
+  <div class="stats-grid">
+    <div class="stat-card">
+      <label>Temp. Mínima</label>
+      <div class="stat-val" id="tempMin" style="color:#ff6b6b">--</div>
+    </div>
+    <div class="stat-card">
+      <label>Temp. Máxima</label>
+      <div class="stat-val" id="tempMax" style="color:#ff6b6b">--</div>
+    </div>
+    <div class="stat-card">
+      <label>Temp. Promedio</label>
+      <div class="stat-val" id="tempProm" style="color:#ff6b6b">--</div>
+    </div>
+    <div class="stat-card">
+      <label>Hum. Mínima</label>
+      <div class="stat-val" id="humMin" style="color:#00d4ff">--</div>
+    </div>
+    <div class="stat-card">
+      <label>Hum. Máxima</label>
+      <div class="stat-val" id="humMax" style="color:#00d4ff">--</div>
+    </div>
+    <div class="stat-card">
+      <label>Hum. Promedio</label>
+      <div class="stat-val" id="humProm" style="color:#00d4ff">--</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="chart-box">
+      <h3>🌡️ Temperatura — últimos 20 datos (°C)</h3>
+      <canvas id="chartTemp" height="180"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3>💧 Humedad — últimos 20 datos (%)</h3>
+      <canvas id="chartHum" height="180"></canvas>
+    </div>
+  </div>
+  <div class="chart-box" style="margin-bottom:24px">
+    <h3>📈 Temperatura + Humedad combinadas (últimos 20)</h3>
+    <canvas id="chartCombined" height="120"></canvas>
+  </div>
+
+  <!-- Table -->
+  <div class="table-box">
+    <div class="table-header">
+      <h3>📋 Últimos 20 registros</h3>
+      <button class="btn-export" onclick="exportarCSV()">⬇️ Exportar CSV</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Temperatura</th>
+            <th>Humedad</th>
+            <th>Dispositivo</th>
+            <th>Timestamp</th>
+          </tr>
+        </thead>
+        <tbody id="tablaBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</main>
+
+<footer>Servidor IoT FastAPI — 2026</footer>
+
+<script>
+  // Chart initialization
+  const chartDefaults = {
+    type: 'line',
+    options: {
+      responsive: true,
+      animation: { duration: 400 },
+      plugins: { legend: { labels: { color: '#ccc' } } },
+      scales: {
+        x: { ticks: { color: '#888', maxTicksLimit: 8 }, grid: { color: '#1e2d4a' } },
+        y: { ticks: { color: '#888' }, grid: { color: '#1e2d4a' } }
+      }
+    }
+  };
+
+  const chartTemp = new Chart(document.getElementById('chartTemp').getContext('2d'), {
+    ...chartDefaults,
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Temperatura (°C)',
+        data: [],
+        borderColor: '#ff6b6b',
+        backgroundColor: 'rgba(255,107,107,0.12)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#ff6b6b'
+      }]
+    }
+  });
+
+  const chartHum = new Chart(document.getElementById('chartHum').getContext('2d'), {
+    ...chartDefaults,
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Humedad (%)',
+        data: [],
+        borderColor: '#00d4ff',
+        backgroundColor: 'rgba(0,212,255,0.12)',
+        tension: 0.4,
+        fill: true,
+        pointRadius: 4,
+        pointBackgroundColor: '#00d4ff'
+      }]
+    }
+  });
+
+  const chartCombined = new Chart(document.getElementById('chartCombined').getContext('2d'), {
+    ...chartDefaults,
+    data: {
+      labels: [],
+      datasets: [
+        {
+          label: 'Temperatura (°C)',
+          data: [],
+          borderColor: '#ff6b6b',
+          backgroundColor: 'rgba(255,107,107,0.08)',
+          tension: 0.4,
+          fill: false,
+          pointRadius: 3,
+          yAxisID: 'yTemp'
+        },
+        {
+          label: 'Humedad (%)',
+          data: [],
+          borderColor: '#00d4ff',
+          backgroundColor: 'rgba(0,212,255,0.08)',
+          tension: 0.4,
+          fill: false,
+          pointRadius: 3,
+          yAxisID: 'yHum'
+        }
+      ]
+    },
+    options: {
+      ...chartDefaults.options,
+      scales: {
+        x: { ticks: { color: '#888', maxTicksLimit: 8 }, grid: { color: '#1e2d4a' } },
+        yTemp: {
+          type: 'linear', position: 'left',
+          ticks: { color: '#ff6b6b' }, grid: { color: '#1e2d4a' },
+          title: { display: true, text: '°C', color: '#ff6b6b' }
+        },
+        yHum: {
+          type: 'linear', position: 'right',
+          ticks: { color: '#00d4ff' }, grid: { drawOnChartArea: false },
+          title: { display: true, text: '%', color: '#00d4ff' }
+        }
+      }
+    }
+  });
+
+  function shortLabel(ts) {
+    const d = new Date(ts);
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  }
+
+  async function actualizarDashboard() {
+    try {
+      const res = await fetch('/datos');
+      if (!res.ok) throw new Error('Sin respuesta');
+      const json = await res.json();
+      const todos = json.datos || [];
+      const ultimos20 = todos.slice(-20);
+
+      // Cards
+      if (ultimos20.length > 0) {
+        const ultimo = ultimos20[ultimos20.length - 1];
+        document.getElementById('tempActual').textContent = ultimo.temperatura.toFixed(1) + ' °C';
+        document.getElementById('humActual').textContent  = ultimo.humedad.toFixed(1) + ' %';
+        document.getElementById('dispositivoVal').innerHTML = `<span class="badge-dev">${ultimo.dispositivo}</span>`;
+
+        // Status indicator
+        const tsUltimo = new Date(ultimo.timestamp);
+        const diffSeg = Math.round((Date.now() - tsUltimo.getTime()) / 1000);
+        const dot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        if (diffSeg < 30) {
+          dot.className = 'dot conectado';
+          statusText.textContent = `Conectado — último dato hace ${diffSeg}s`;
+        } else {
+          dot.className = 'dot sin-datos';
+          statusText.textContent = `Sin datos recientes — hace ${diffSeg}s`;
+        }
+      }
+
+      document.getElementById('totalReg').textContent = todos.length;
+
+      // Stats
+      if (todos.length > 0) {
+        const temps = todos.map(d => d.temperatura);
+        const hums  = todos.map(d => d.humedad);
+        document.getElementById('tempMin').textContent  = Math.min(...temps).toFixed(1) + ' °C';
+        document.getElementById('tempMax').textContent  = Math.max(...temps).toFixed(1) + ' °C';
+        document.getElementById('tempProm').textContent = (temps.reduce((a,b)=>a+b,0)/temps.length).toFixed(1) + ' °C';
+        document.getElementById('humMin').textContent   = Math.min(...hums).toFixed(1) + ' %';
+        document.getElementById('humMax').textContent   = Math.max(...hums).toFixed(1) + ' %';
+        document.getElementById('humProm').textContent  = (hums.reduce((a,b)=>a+b,0)/hums.length).toFixed(1) + ' %';
+      }
+
+      // Charts
+      const labels = ultimos20.map(d => shortLabel(d.timestamp));
+      const tempData = ultimos20.map(d => d.temperatura);
+      const humData  = ultimos20.map(d => d.humedad);
+
+      chartTemp.data.labels = labels;
+      chartTemp.data.datasets[0].data = tempData;
+      chartTemp.update();
+
+      chartHum.data.labels = labels;
+      chartHum.data.datasets[0].data = humData;
+      chartHum.update();
+
+      chartCombined.data.labels = labels;
+      chartCombined.data.datasets[0].data = tempData;
+      chartCombined.data.datasets[1].data = humData;
+      chartCombined.update();
+
+      // Table (últimos 20 en orden descendente)
+      const tbody = document.getElementById('tablaBody');
+      tbody.innerHTML = '';
+      const reversed = [...ultimos20].reverse();
+      reversed.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${d.id}</td>
+          <td class="temp-val">${d.temperatura.toFixed(1)} °C</td>
+          <td class="hum-val">${d.humedad.toFixed(1)} %</td>
+          <td>${d.dispositivo}</td>
+          <td>${d.timestamp}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } catch (err) {
+      console.error('Error actualizando dashboard:', err);
+      document.getElementById('statusDot').className = 'dot sin-datos';
+      document.getElementById('statusText').textContent = 'Error de conexión';
+    }
+  }
+
+  function exportarCSV() {
+    window.location.href = '/csv';
+  }
+
+  // Initial load + interval
+  actualizarDashboard();
+  setInterval(actualizarDashboard, 5000);
+</script>
+</body>
+</html>
